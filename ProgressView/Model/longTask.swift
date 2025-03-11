@@ -1,82 +1,49 @@
 //
-//  Run 2.swift
+//  longTask.swift
 //  ProgressView
 //
 //  Created by Phil Kelly on 3/10/25.
 //
 
 
-//
-//  run.swift
-//  ProgressView
-//
-//  Created by Phil Kelly on 3/3/25.
-//
-
 import Foundation
 
-var gRun = Run()
+var lengthyProgress: Double = 0
 
-class Run : ObservableObject {
-    var progress: Double = 0
-    @Published var isRunning: Bool = false
-    
-    func longRunningTask() {
-        progress = 0
-        while progress < 100 {
-            progress += 10
-            longRunningTask2()
-//            Task {
-//                await longRunningAsyncTask()
-//            }
-            print ("\(progress)")
-        }
+// MARK: - Code without async/await
+
+func lengthyOperation() {
+    print ("long running function: start")
+    lengthyProgress = 0
+    while lengthyProgress < 100 {
+        lengthyProgress += 10
+        lengthyStep()
+        print ("long running function: progress = \(lengthyProgress)")
     }
+    print ("long running function: done")
 }
 
-func longRunningTask2() {
+func lengthyStep() {
     for i in 0..<1000000 {
         let _ = i * 2
     }
 }
 
-func longRunningAsyncTask() async {
-    do {
-        try await Task.sleep(for: .milliseconds(500))
-    } catch {
-        print("Error: %{public}@\n", error.localizedDescription)
+// MARK: - Code using async/await
+
+func lengthyOperationAsync() async {
+    print ("long running function: start")
+    lengthyProgress = 0
+    while lengthyProgress < 100 {
+        lengthyProgress += 10
+        await lengthyStepAsync()
+        print ("long running function: progress = \(lengthyProgress)")
     }
+    print ("long running function: done")
 }
 
-
-//func longRunningAsyncTask(_ run: Run) async {
-//    run.progress = 0
-//    while run.progress < 100 {
-//        run.progress += 10
-//        do {
-//            try await Task.sleep(for: .milliseconds(500))
-//            print ("\(run.progress)")
-//        } catch {
-//            print("Error: %{public}@\n", error.localizedDescription)
-//        }
-//    }
-//}
-
-//func longRunningAsyncTask() async {
-//    var start = 0
-//    while start < 100 {
-//        start += 10
-//        do {
-//            try await Task.sleep(for: .milliseconds(500))
-//            print ("\(start)")
-//        } catch {
-//            print("Error: %{public}@\n", error.localizedDescription)
-//        }
-//    }
-//}
-//
-//func longRunningTask() {
-//    Task {
-//        await longRunningAsyncTask()
-//    }
-//}
+func lengthyStepAsync() async {
+    for i in 0..<1000000 {
+        let _ = i * 2
+    }
+}

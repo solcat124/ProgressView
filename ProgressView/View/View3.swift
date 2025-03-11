@@ -1,5 +1,5 @@
 //
-//  View2 2.swift
+//  View3.swift
 //  ProgressView
 //
 //  Created by Phil Kelly on 3/10/25.
@@ -11,7 +11,9 @@
 
 import SwiftUI
 
-struct View2: View {
+// MARK: - Progress View
+
+struct View3: View {
     @Binding var show: Bool
     @State private var progress: Double = 0.0
     let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
@@ -20,9 +22,10 @@ struct View2: View {
         VStack(alignment: .leading) {
             ProgressView("Processing...", value: progress, total: 100.0)
                 .onReceive(timer) { _ in
-                    progress = taskProgress
+                    progress = lengthyProgress
                     if progress >= 100.0 {
                         show = false
+                        timer.upstream.connect().cancel()
                     }
                 }
             Text("\(Int(progress))/100")
@@ -33,5 +36,6 @@ struct View2: View {
 
 #Preview {
     @Previewable @State var show: Bool = true
-    View2(show: $show)
+    RunViewDispatch(message: "Version 2 but task runs synchronously", version: "3")
+    View3(show: $show)
 }

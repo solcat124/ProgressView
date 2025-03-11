@@ -7,11 +7,13 @@
 
 
 // Display ProgressView
-// progress is updated independent of any model code
+// progress is dependent model code
 
 import SwiftUI
 
-struct View1: View {
+// MARK: - Progress View
+
+struct View2: View {
     @Binding var show: Bool
     @State private var progress: Double = 0.0
     let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
@@ -20,9 +22,8 @@ struct View1: View {
         VStack(alignment: .leading) {
             ProgressView("Processing...", value: progress, total: 100.0)
                 .onReceive(timer) { _ in
-                    if progress < 100.0 {
-                        progress += 10
-                    } else {
+                    progress = lengthyProgress     // lengthyProgress is updated in model code
+                    if progress >= 100.0 {
                         show = false
                     }
                 }
@@ -34,5 +35,6 @@ struct View1: View {
 
 #Preview {
     @Previewable @State var show: Bool = true
-    View1(show: $show)
+    RunViewDispatch(message: "Progress is independent on the model code", version: "2")
+    View2(show: $show)
 }

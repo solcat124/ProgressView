@@ -5,6 +5,10 @@
 //  Created by Phil Kelly on 3/10/25.
 //
 
+// Call lengthyOperation as part of a DispatchQueue
+// Call a View based on a given version
+
+
 import SwiftUI
 
 // MARK: - Run View
@@ -26,7 +30,6 @@ struct RunViewDispatch: View {
                 Text("Show version \(version)")
             }
         }
-        .padding()
 
         if isRunning {
             if version == "1" {

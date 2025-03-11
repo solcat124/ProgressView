@@ -8,71 +8,25 @@
 import SwiftUI
 
 struct ContentView: View {
-     @State private var isRunning = false
-    
-    var body: some View {
-        VStack {
-            Text("Progress is independent of the model code")
-            Button {
-                isRunning = true
-                DispatchQueue.global(qos: .background).async {
-                    longRunningFunction()
-                }
-            } label: {
-                Text("Show version 1")
-            }
-        }
-        .padding()
 
-        if isRunning {
-            View1(show: $isRunning)
-        }
+    var body: some View {
+        RunViewX()
+            .padding()
+        RunView0()
+            .padding()
+        RunViewDispatch(message: "Progress is independent of the model code", version: "1")
+            .padding()
+        RunViewDispatch(message: "Progress is dependent on the model code",   version: "2")
+            .padding()
+        RunViewDispatch(message: "Version 2 plus timer is killed when done",  version: "3")
+            .padding()
+        RunViewSync    (message: "Version 3 but task runs synchronously",     version: "4")
+            .padding()
+        RunViewAsync   (message: "Version 3 but runs async task",             version: "5")
+            .padding()
     }
 }
 
-#Preview {
+#Preview(traits: .sizeThatFitsLayout) {
     ContentView()
 }
-
-
-
-
-//struct ContentView: View {
-//    @StateObject private var run = gRun
-//    @State private var isRunningB = false
-//    
-//    var body: some View {
-//        VStack {
-//            Button {
-//                run.isRunning = true
-//                DispatchQueue.global(qos: .background).async {
-//                    run.longRunningTask()
-//                }
-//            } label: {
-//                Text("Show version 1")
-//            }
-//        }
-//        .padding()
-//
-//        if run.isRunning {
-//            RunView()
-//        }
-//
-//        VStack {
-//            Button {
-//                isRunningB = true
-//                DispatchQueue.global(qos: .background).async {
-//                    longRunningTaskB()
-//                }
-//            } label: {
-//                Label("Run Version B", systemImage: "doc.circle")
-//            }
-//        }
-//        .padding()
-//
-//        if isRunningB {
-//            RunViewB()
-//        }
-//
-//
-//    }

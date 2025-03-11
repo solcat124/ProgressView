@@ -1,5 +1,5 @@
 //
-//  RunViewDispatch 2.swift
+//  RunViewSync.swift
 //  ProgressView
 //
 //  Created by Phil Kelly on 3/10/25.
@@ -7,13 +7,13 @@
 
 
 //
-//  RunViewDispatch.swift
+//  RunViewSync.swift
 //  ProgressView
 //
 //  Created by Phil Kelly on 3/10/25.
 //
 
-// Call lengthyOperation as part of a DispatchQueue
+// Call lengthyOperation directly
 // Call a View based on a given version
 
 
@@ -21,7 +21,7 @@ import SwiftUI
 
 // MARK: - Run View
 
-struct RunViewDispatch: View {
+struct RunViewSync: View {
     @State var message: String
     @State var version: String
     @State private var isRunning = false
@@ -31,23 +31,14 @@ struct RunViewDispatch: View {
             Text(message)
             Button {
                 isRunning = true
-                DispatchQueue.global(qos: .background).async {
-                    lengthyOperation()
-                }
+                lengthyOperation()
             } label: {
                 Text("Show version \(version)")
             }
         }
-        .padding()
 
         if isRunning {
-            if version == "1" {
-                View1(show: $isRunning)
-            }
-            if version == "2" {
-                View2(show: $isRunning)
-            }
-            if version == "3" {
+            if version == "4" {
                 View3(show: $isRunning)
             }
         }
@@ -56,5 +47,5 @@ struct RunViewDispatch: View {
 
 #Preview {
     @Previewable @State var message: String = "Hello, World!"
-    RunViewDispatch(message: message, version: "2")
+    RunViewSync(message: message, version: "4")
 }

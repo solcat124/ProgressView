@@ -1,52 +1,162 @@
 #  Determinate ProgressView
 
 ## Getting Started
-Displaying something to indicate a task is running is conceptually straightforward:
 
-- start spinner display
-- run task
-- stop spinner display
-
-Displaying a spinner can use `ProgressView` to manage what the display looks like.
-This is relatively straightforward, although the display and run part are coded independently -- they do not share progress information. This makes displaying indeterminate progress very easy, but not so much for determinate progress. 
-
-It is common to see suggestions for creating a determinate progress view:
+### A Lengthy Operation
+Executing a task, for example using a button to run the task is straightforward. In this implementation, clicking the button launches a function `lengthyOperation`:
 
 ```
-struct ShowProgressView: View {
-    @State private var progress: Double = 0.0    
+struct RunViewX: View {
+    var body: some View {
+        VStack {
+            Button {
+                lengthyOperation()
+            } label: {
+                Text("Run")
+            }
+        }
+     }
+}
+```
 
+As the function may take a while to complete, providing feedback to the user that all is well can be helpful. (Another important consideration is that the application is unresponsive while `lengthyOperation` is running.)
+
+For the sake of discussion, consider the following model code. The `lengthyOperation` function has some defined steps where progess can be reported, and goes off for extended time while computing these steps. While it might seem tempting to simulate the lengthy task using a sleep-like function, doing so leads one down a rabbit hole on how to avoid timer concurrency concerns that are likely not relevant here. Using a processing loop avoids side issues and probably better mimics code in an actual implementation.
+
+```
+var lengthyProgress: Double = 0
+
+// MARK: - Code without async/await
+
+func lengthyOperation() {
+    print ("long running function: start")
+    lengthyProgress = 0
+    while lengthyProgress < 100 {
+        lengthyProgress += 10
+        lengthyStep()
+        print ("long running function: progress = \(lengthyProgress)")
+    }
+    print ("long running function: done")
+}
+
+func lengthyStep() {
+    for i in 0..<1000000 {
+        let _ = i * 2
+    }
+}
+
+```
+
+### Determinate Progress View
+A progress view is one that shows progress toward completion of a task. An indeterminate view shows progress while completing a task of unknown duration.
+A determine view shows a measure of progress while completing a task with a determinate end, such as downloading a file with a known size or advancing through a defined number of steps.
+ 
+SwiftUI's `ProgressView` can be used to manage the display of the progress view. 
+
+A basic determinate progress view with a given progress toward completion is shown in this image:
+
+![progress view](ReadMe.view.jpg)
+
+The top portion shows the display when the progress and total values are 0, where the completion bar moves back and forth from 0 to 100%. The bottom portion displays a completion bar when the total is not 0.
+
+This is the view code for the image above: 
+
+```
+struct View0: View {
     var body: some View {
         VStack(alignment: .leading) {
-            ProgressView("Processing...", value: progress, total: 100.0)
+            ProgressView("Processing...", value: 0, total: 100.0)
+            Text("\(Int(0))/100")
+        }
+        .padding()
+
+        
+        VStack(alignment: .leading) {
+            ProgressView("Processing...", value: 20, total: 100.0)
+            Text("\(Int(20))/100")
+        }
+        .padding()
+    }
+}
+```
+
+This view code shows a button that toggles display of the progress view above:
+
+```
+struct RunView0: View {
+    @State private var isRunning = false
+
+    var body: some View {
+        VStack {
+            Text("Static progress display")
+            Toggle(isOn: $isRunning) {
+                Text("Version 0")
+            }
+            .toggleStyle(.button)
+        }
+        .padding()
+
+        if isRunning {
+            View0()
+                .padding()
+        }
+
+     }
+}
+
+```
+
+## Asynchronous Operation
+Running a model task and progress view synchronously means that they run sequentially. The result is that the progress view starts with the progress at 0, then the model task runs, and when the model task is finished the progress view is updated with the latest value of `progress` (quite possibly 100%). In other words, the actual progress is not effectively displayed. To be effective, the model task can be run asynchronously so that the view and model code run concurrently.
+
+In this code a user launches a model task, `lengthyOperation` asynchronously: 
+
+```
+struct RunViewDispatch: View {
+    @State private var isRunning = false
+
+    var body: some View {
+        VStack {
+            Text("Progress is independent of the model code")
+            Button {
+                isRunning = true
+                DispatchQueue.global(qos: .background).async {
+                    lengthyOperation()
+                }
+            } label: {
+                Text("Show version 1")
+            }
+        }
+        .padding()
+
+        if isRunning {
+            View1(show: $isRunning)
         }
     }
 }
 ```
 
-This creates a static view showing the given level of progress. 
+## Dynamic Progress: Adding a Timer
+Displaying a dynamic level of progress is more invovled as some level of interaction is required so that progress made during the run task is used by the progress display. In a model-view paradigm, interaction between modeling code and view code must be done with care to avoid the **Publishing changes from background threads is not allowed** warning.
 
-Note that if the total value is 0, the progress view displays an animation where the completion bar moves back and forth from 0 to 100. 
+One way to deal with a dynamic level of progress is to use a timer, where timer events are used to update the view on the status of the model code. This works because the timer event can make use of the `.onReceive` method that deals with concurrency. This avoids a warning about publishing changes from background threads.
 
-
-Displaying a dynamic level of progress is complicated, as some level of interaction is required so that progress made during the run task is used by the spinner display. In a model-view paradigm, interaction between modeling code and view code is not straightforward. Avoiding the **Publishing changes from background threads is not allowed** warning gets messy.
-
-## Adding a Timer
-One way to deal with a dynamic level of progress is to use a timer, where timer events are used to update the view on the status of the model code. This works because the timer event can make use of the `.onReceive` method that deals with concurrency. This avoids warning about publishing changes from background threads.
-
-Here's View code that adds a timer that dynamically creates an event where the progress can be updated.
+Here's view code that adds a timer that dynamically creates an event where the progress can be updated.
 
 ```
-struct ShowProgressView: View {
-    @State private var progress: Double = 0.0    
+struct View1: View {
+    @Binding var show: Bool
+    @State private var progress: Double = 0.0
     let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading) {
             ProgressView("Processing...", value: progress, total: 100.0)
-                .onReceive(timer) { _ in                // uses the `.onReceive(timer)` call, which allows the progress to be updated.
+                .onReceive(timer) { _ in
                     if progress < 100.0 {
-                        progress += 10                  // updates progress (but still not dependent on anything)
+                        progress += 10 // updates progress (but independent of model code)
+                    } else {
+                        show = false
                     }
                 }
             Text("\(Int(progress))/100")
@@ -56,154 +166,42 @@ struct ShowProgressView: View {
 }
 ```
 
-Although the progress is dynamically updated, it isn't based on model code. So while this might look interesting, it likely isn't very useful without additional coding. We need the `progress` value to be set to a value reported in model code. 
+Although the progress is dynamically updated, it isn't based on model code. So while this might look interesting, it likely isn't very useful without additional coding. We need the `progress` value to be linked to a value reported in model code. 
 
-## Asynchronous Operation
-Running a model task synchronously with the progress view means that the the progress view will be displayed, the model task will start and run to completion, and and then any progress view updates are made. The result is that the progress display starts with progress at 0, the model task runs, and then the progress display updates, likely with progress at 100 percent.  While the progress view is displayed, actual progress is not effectively displayed. To get around this, the model task can be run asynchronously.
+###App Version 1
 
-In this code a user launches a model task, say `longRunningFunction` asynchronously: 
+In review, here is the sequence of events:
 
-```
-struct ContentView: View {
-    @State var isRunning = false
-    
-    var body: some View {
-        Button {
-            isRunning = true                                        // the user wants to run a task that may take awhile and to display progress
-            DispatchQueue.global(qos: .background).async {          // indicates that the long-running process should run in parallel with the GUI. Otherwise the GUI won't update until the long-running process completes.
-                longRunningFunction()                               // launch the long-running process
-            }
-        } label: {
-            Label("Run")
-        }
+- display a button to launch the `lengthyOperation` function -- see RunViewDispatch
+- start progress display -- see View1
+- run the task -- see the model implementation of `lengthyOperation`
+- stop progress display -- updates stop when progress = 100%, see View 1
 
-        if isRunning {                                              
-            RunView()                                               // display the progress
-        }
-    }
-}
-```
+Note that the reported progress is independent of the function `lengthyOperation`, so the progress reported has nothing to do with the actual progress. This is considered next. 
+
+![progress view1](ReadMe.view1.png)
 
 ## Linking the View and Model
-In the code above the progress view still has no knowledge of the status of `longRunningFunction`. And with no way to set isRunning to `false`, the progress remains displayed after the long-running process completes. (Which may nor may not be desireable. It seems that the timer will continue to run as long as the ShowProgressView is being executed.)
+In the code above the progress view still has no knowledge of the status of `lengthyOperation`. It also seems that the timer will continue to run as long as the progress view is being executed.
 
-Consider the following model code:
+Looking back at the implementation of `lengthyOperation`, there is a global variable `lengthyProgress` that reports its progress.
 
-```
-var status: Double = 0.0                            // makes the progress of a longRunningFunction available
+In this version of the progress view the view `progress` is tied to `lengthyProgress`:
 
-func longRunningFunction() {                        // a function that takes some time to complete
-    status = 0
-    while status < 100 {
-        status += 10                                // update progress
-        lengthyTask()                               // something to simulate a lengthy task
-        print ("\(status)")
-    }
-
-func lengthyTask() {                                // simulation of processing that can take some time to complete
-    for i in 0..<1000000 {                          // avoid sleep-like functions that bring in concepts of concurrency not relevant here
-        let _ = i * 2
-    }
-}
-```
-
-It is tempting to implement the lengthy task using a sleep-like function -- it seems so simple, but it leads one down a rabbit hole on how to avoid timer concurrency concerns that are likely not relevant here. Using a processing loop avoids side issues and probably better mimics code in an actual implementation.
-
-The progress view can now be modified to use the status reported by the model code through the global `status` variable that is updated asynchronously.
 
 ```
-struct ShowProgressView: View {
-    @State private var progress: Double = 0.0    
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            ProgressView("Processing...", value: progress, total: 100.0)
-                .onReceive(timer) { _ in                // uses the `.onReceive(timer)` call, which allows the progress to be updated.
-                    progress = status                   // progress is updated with the current value of status reported by longRunningFunction
-                }
-            Text("\(Int(progress))/100")
-        }
-        .padding()
-    }
-}
-```
-
-## A Complete Solution (mostly)
-
-The sequence of events starts when a user presses a start button in the ContentView. This sets `isRunning` to `true` and launches `longRunningFunction`. At the timer intervals, the `progress` is updated to `status` 
-
-To inform the GUI when the process ends, `isRunning` to set to `false` when the progress reaches 100%.
-
-Consider a class Run and a global variable to an instance to it, as well as minor updates to ContentView and ShowProgressView:
-:
-
-```
-// Model 
-var gRun = Run()
-
-class Run : ObservableObject {
-    var status: Double = 0                          // reports the progress of a longRunningFunction
-    @Published var isRunning: Bool = false          // including this notifies ContentView when the long-running task ends (see ShowProgressView)
-    
-    func longRunningFunction() {.                   // a function that takes some time to complete
-        status = 0
-        while status < 100 {
-            status += 10                            // update progress
-            lengthyTask()                           // something to simulate a lengthy task
-            print ("\(status)")
-        }
-        isRunning = false
-    }
-}
-
-func lengthyTask() {                                // simulation of processing that can take some time to complete
-    for i in 0..<1000000 {                          // avoid sleep-like functions that bring in concepts of concurrency not relevant here
-        let _ = i * 2
-    }
-}
-```
-
-```
-// Content View
-struct ContentView: View {
-    @StateObject private var run = gRun
-    
-    var body: some View {
-        VStack {
-            Button {
-                run.isRunning = true
-                DispatchQueue.global(qos: .background).async {
-                    run.longRunningFunction()
-                }
-            } label: {
-                Label("Run Version A", systemImage: "doc.circle")
-            }
-        }
-        .padding()
-
-        if run.isRunning {
-            RunView()
-        }
-    }
-}
-```
-
-```
-// Progress View
-struct ShowProgressView: View {
-    @StateObject private var run = gRun
+struct View2: View {
+    @Binding var show: Bool
     @State private var progress: Double = 0.0
-    
     let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading) {
             ProgressView("Processing...", value: progress, total: 100.0)
                 .onReceive(timer) { _ in
-                    progress = run.progress
+                    progress = lengthyProgress     // lengthyProgress is updated in model code
                     if progress >= 100.0 {
-                        run.isRunning = false           // report the task has been completed
+                        show = false
                     }
                 }
             Text("\(Int(progress))/100")
@@ -214,28 +212,28 @@ struct ShowProgressView: View {
 ```
 
 ## Stop the Timer
-It is possible to kill the timer:
+It is possible to kill the timer using
 
 ```
 timer.upstream.connect().cancel()
 ```
 
+Adding this to the progress view looks like 
+
 ```
-// Progress View
-struct ShowProgressView: View {
-    @StateObject private var run = gRun
+struct View3: View {
+    @Binding var show: Bool
     @State private var progress: Double = 0.0
-    
     let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading) {
             ProgressView("Processing...", value: progress, total: 100.0)
                 .onReceive(timer) { _ in
-                    progress = run.progress
+                    progress = lengthyProgress
                     if progress >= 100.0 {
+                        show = false
                         timer.upstream.connect().cancel()
-                        run.isRunning = false           // report the task has been completed
                     }
                 }
             Text("\(Int(progress))/100")
@@ -245,99 +243,94 @@ struct ShowProgressView: View {
 }
 ```
 
-In this case when the progress becomes 100% the timer stops running and the progress view becomes static. 
+When the progress becomes 100%, the timer stops running and the progress view becomes static. 
 
+### App Version 3: A Complete Solution 
 
+In review, here is the sequence of events:
 
+- display a button to launch the `lengthyOperation` function -- see RunViewDispatch
+- start progress display -- see View3
+- run the task -- see the model implementation of `lengthyOperation`
+- stop progress display -- updates stop when progress = 100%, see View 3
 
+## Alternate Asynchronous Implementation
 
-
-
-
-
-
-
-
-
-## Old material to delete
-The sequence of events starts when a user presses a start button and isRunning is set `true`. To inform the GUI when the process ends, the `isRunning` parameter is set `false`.
-
-
-This code includes a timer. The `.onReceive` method allows `progress` to be updated (and avoid the "Publishing changes from background threads is not allowed" warning.)
+Wrapping the `lengthyOperation` function in 
 
 ```
-struct ShowProgressView: View {
-    @State private var progress: Double = 0.0    
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            ProgressView("Processing...", value: progress, total: 100.0)
-                .onReceive(timer) { _ in
-                    progress += 10
-                    if progress >= 100.0 {
-                        run.isRunning = false
-                    }
-                }
-            Text("\(Int(progress))/100")
-        }
-        .padding()
-    }
+DispatchQueue.global(qos: .background).async {
+    lengthyOperation()
 }
 ```
 
-This still doesn't address how `progress` can be tied to a function outside of ContentView.
+indicates that `lengthyOperation` is to be run asynchronously, which allows the execution of `lengthyOperation` and `ProgressView` to be run concurrently.
 
-Consider a class Run:
+An alternate approach is to use the async/await concurrency code.
+
+The async version of the model code looks like
 
 ```
-var gRun = Run()
-
-class Run : ObservableObject {
-    var progress: Double = 0
-    @Published var isRunning: Bool = false
-    
-    func longRunningFunction() {
-        progress = 0
-        while progress < 100 {
-            progress += 10
-            longRunningFunction()
-            print ("\(progress)")
-        }
+func lengthyOperationAsync() async {
+    print ("long running function: start")
+    lengthyProgress = 0
+    while lengthyProgress < 100 {
+        lengthyProgress += 10
+        await lengthyStepAsync()
+        print ("long running function: progress = \(lengthyProgress)")
     }
+    print ("long running function: done")
 }
 
-func longRunningFunction() {
+func lengthyStepAsync() async {
     for i in 0..<1000000 {
         let _ = i * 2
     }
 }
 ```
 
-The `progress` parameter is not published as it will be changed in a background thread. The `isRunning` parameter is published.
-
-Displaying the progress view involves something like
+Within the view code,
 
 ```
-struct ContentView: View {
-    @StateObject private var run = gRun
+DispatchQueue.global(qos: .background).async {
+    lengthyOperation()
+}
+```
+
+is replaced by
+
+```
+Task { @MainActor in
+    await lengthyOperationAsync()
+}
+```
+
+The `Task{@MainActor}` construct is included since the function is being called within a SwiftUI function that does not support concurrency.
+
+The new view code looks like
+
+```
+struct RunViewAsync: View {
+    @State var message: String
+    @State var version: String
+    @State private var isRunning = false
+
     var body: some View {
-        Button {
-            run.isRunning = true
-            DispatchQueue.global(qos: .background).async {
-                run.longRunningFunction()
+        VStack {
+            Text(message)
+            Button {
+                isRunning = true
+                Task { @MainActor in
+                    await lengthyOperationAsync()
+                }
+            } label: {
+                Text("Show version \(version)")
             }
-        } label: {
-            Label("Run")
         }
 
-        if gRun.isRunning {
-            RunView()
+        if isRunning {
+            View3(show: $isRunning)
         }
     }
 }
 ```
-
-
-
-
