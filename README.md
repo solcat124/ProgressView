@@ -1,9 +1,23 @@
 #  Determinate ProgressView
 
+## About
+
+The macOS app documented here looks at different aspects of displaying a determinate progress view. The goal is to understand how to have progress in the completion of a function displayed using ProgressView.
+
+![app view](ReadMe.app.png)
+
+- Version X: getting start -- run a lengthy operation without displaying a progress view
+- Version 0: the basics -- shows what a default determinate progress bar looks like; brings up 2 instances of a progress view with a static progress value
+- Version 1: show a progress bar that shows progress, but the progress isn't meaningful
+- Version 2: working example -- show a progress bar that shows progress of a function executing a lengthy operation
+- Version 3: enhances version 2
+- Version 4: a demonstration of how things fail 
+- Version 5: an alternate of Version 3 based on async/await code
+
 ## Getting Started
 
 ### A Lengthy Operation
-Executing a task, for example using a button to run the task is straightforward. In this implementation, clicking the button launches a function `lengthyOperation`:
+Executing a task, for example using a button to run the task, is straightforward. In this implementation, clicking the button launches a function `lengthyOperation`:
 
 ```
 struct RunViewX: View {
@@ -65,7 +79,7 @@ This is the view code for the image above:
 struct View0: View {
     var body: some View {
         VStack(alignment: .leading) {
-            ProgressView("Processing...", value: 0, total: 100.0)
+            ProgressView("Processing...", value: 0, total: 0.0)
             Text("\(Int(0))/100")
         }
         .padding()
@@ -168,7 +182,7 @@ struct View1: View {
 
 Although the progress is dynamically updated, it isn't based on model code. So while this might look interesting, it likely isn't very useful without additional coding. We need the `progress` value to be linked to a value reported in model code. 
 
-###App Version 1
+### App Version 1
 
 In review, here is the sequence of events:
 
